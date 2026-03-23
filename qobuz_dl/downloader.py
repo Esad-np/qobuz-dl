@@ -5,6 +5,8 @@ from typing import Tuple
 import requests
 from pathvalidate import sanitize_filename, sanitize_filepath
 from tqdm import tqdm
+from PIL import Image
+from resizeimage import resizeimage
 
 import qobuz_dl.metadata as metadata
 from qobuz_dl.color import OFF, GREEN, RED, YELLOW, CYAN
@@ -97,7 +99,8 @@ class Download:
         folder_format, track_format = _clean_format_str(
             self.folder_format, self.track_format, file_format
         )
-        sanitized_title = sanitize_filepath(folder_format.format(**album_attr))
+        sanitized_title = sanitize_filename(folder_format.format(**album_attr))
+        sanitized_title = sanitized_title.replace('FOLDER_BREAK','/')
         dirn = os.path.join(self.path, sanitized_title)
         os.makedirs(dirn, exist_ok=True)
 
@@ -156,8 +159,8 @@ class Download:
             track_attr = self._get_track_attr(
                 meta, track_title, bit_depth, sampling_rate
             )
-            sanitized_title = sanitize_filepath(folder_format.format(**track_attr))
-
+            sanitized_title = sanitize_filename(folder_format.format(**track_attr))
+            sanitized_title = sanitized_title.replace('FOLDER_BREAK','/')
             dirn = os.path.join(self.path, sanitized_title)
             os.makedirs(dirn, exist_ok=True)
             if self.no_cover:
@@ -177,7 +180,7 @@ class Download:
                 meta,
                 True,
                 is_mp3,
-                False,
+                self.embed_art,
             )
         else:
             logger.info(f"{OFF}Demo. Skipping")
@@ -222,7 +225,8 @@ class Download:
             logger.info(f"{OFF}{track_title} was already downloaded")
             return
 
-        tqdm_download(url, filename, filename)
+        desc = _get_description(track_url_dict, track_title, multiple)
+        tqdm_download(url, filename, desc)
         tag_function = metadata.tag_mp3 if is_mp3 else metadata.tag_flac
         try:
             tag_function(
@@ -248,6 +252,7 @@ class Download:
             "sampling_rate": track_metadata["maximum_sampling_rate"],
             "tracktitle": track_title,
             "version": track_metadata.get("version"),
+            "disknumber": f"{track_metadata['media_number']:02}",
             "tracknumber": f"{track_metadata['track_number']:02}",
         }
 
@@ -305,7 +310,7 @@ class Download:
             return ("Unknown", quality_met, None, None)
 
 
-def tqdm_download(url, fname, desc):
+def tqdm_download(url, fname, track_name):
     r = requests.get(url, allow_redirects=True, stream=True)
     total = int(r.headers.get("content-length", 0))
     download_size = 0
@@ -314,7 +319,7 @@ def tqdm_download(url, fname, desc):
         unit="iB",
         unit_scale=True,
         unit_divisor=1024,
-        desc=desc,
+        desc=track_name,
         bar_format=CYAN + "{n_fmt}/{total_fmt} /// {desc}",
     ) as bar:
         for data in r.iter_content(chunk_size=1024):
@@ -326,7 +331,21 @@ def tqdm_download(url, fname, desc):
         # https://stackoverflow.com/questions/69919912/requests-iter-content-thinks-file-is-complete-but-its-not
         raise ConnectionError("File download was interrupted for " + fname)
 
-
+def req_tqdmImage(url, dirn, fname, track_name):
+    tqdm_download(url,dirn+fname, track_name)
+    fd_img = open(dirn+fname, 'rb')
+    img = Image.open(fd_img)
+    img = resizeimage.resize_contain(img, [500, 500])
+    img = img.convert("RGB")
+    logger.info(f"{OFF}{fname} saving to ")
+    logger.info(f"{OFF}{dirn} ")
+    img.save(dirn+'/cover.jpg', img.format, quality=95)
+    fd_img.close()
+    if os.path.exists(dirn+fname):
+        os.remove(dirn+fname)
+    else:
+        print("The file does not exist") 
+		
 def _get_description(item: dict, track_title, multiple=None):
     downloading_title = f"{track_title} "
     f'[{item["bit_depth"]}/{item["sampling_rate"]}]'
@@ -347,7 +366,7 @@ def _get_title(item_dict):
     return album_title
 
 
-def _get_extra(item, dirn, extra="cover.jpg", og_quality=False):
+def _get_extra_orig(item, dirn, extra="cover.jpg", og_quality=False):
     extra_file = os.path.join(dirn, extra)
     if os.path.isfile(extra_file):
         logger.info(f"{OFF}{extra} was already downloaded")
@@ -358,6 +377,21 @@ def _get_extra(item, dirn, extra="cover.jpg", og_quality=False):
         extra,
     )
 
+def _get_extra(item, dirn, extra="cover.jpg", og_quality=False):
+    logger.info(f"{OFF}{extra} is the filename")
+    if extra != 'cover.jpg':
+        _get_extra_orig(item, dirn, extra, og_quality)
+    else:
+        extra_file = os.path.join(dirn, extra)
+        if os.path.isfile(extra_file):
+            logger.info(f"{OFF}{extra} was already downloaded")
+            return
+        req_tqdmImage(
+            item.replace("_600.", "_org.") if og_quality else item,
+            dirn,
+            extra,
+            extra_file
+        )
 
 def _clean_format_str(folder: str, track: str, file_format: str) -> Tuple[str, str]:
     """Cleans up the format strings, avoids errors

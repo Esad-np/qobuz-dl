@@ -1,2 +1,10 @@
 Qobuz Downloads
 __pycache__
+qobuz_dl.egg-info/
+dist-info/
+build/
+dist/
+*.egg
+*.egg-info
+*.pyc
+*.pyo

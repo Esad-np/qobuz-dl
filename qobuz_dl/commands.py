@@ -137,6 +137,7 @@ def qobuz_dl_args(
         description=(
             "The ultimate Qobuz music downloader.\nSee usage"
             " examples on https://github.com/vitiko98/qobuz-dl"
+            "\nFork by Esad Brnicanin"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )

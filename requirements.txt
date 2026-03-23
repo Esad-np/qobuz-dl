@@ -5,3 +5,6 @@ tqdm
 pick==1.6.0
 beautifulsoup4
 colorama
+resize-image
+pillow
+python-resize-image
