@@ -16,6 +16,8 @@ requirements = [
     "pick==1.6.0",
     "beautifulsoup4",
     "colorama",
+    "pillow",
+    "python-resize-image",
 ]
 
 setup(
