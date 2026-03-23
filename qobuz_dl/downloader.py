@@ -173,14 +173,14 @@ class Download:
                 )
             is_mp3 = True if int(self.quality) == 5 else False
             self._download_and_tag(
-                dirn,
-                1,
-                parse,
-                meta,
-                meta,
-                True,
-                is_mp3,
-                self.embed_art,
+                root_dir=dirn,
+                tmp_count=1,
+                track_url_dict=parse,
+                track_metadata=meta,
+                album_or_track_metadata=meta,
+                is_track=True,
+                is_mp3=is_mp3,
+                multiple=None,
             )
         else:
             logger.info(f"{OFF}Demo. Skipping")
@@ -226,6 +226,11 @@ class Download:
             return
 
         desc = _get_description(track_url_dict, track_title, multiple)
+        # logger.info(f"{OFF}Downloading track_url_dict: {track_url_dict}")
+        # logger.info(f"{OFF}Downloading track_title: {track_title}")
+        # logger.info(f"{OFF}Downloading multiple: {multiple}")
+        # logger.info(f"{OFF}Downloading track: {desc}")
+
         tqdm_download(url, filename, desc)
         tag_function = metadata.tag_mp3 if is_mp3 else metadata.tag_flac
         try:
